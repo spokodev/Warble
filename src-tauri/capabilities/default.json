@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capability for the main window and tray",
+  "windows": ["main", "status-bar", "settings", "history"],
+  "permissions": [
+    "core:default",
+    "global-shortcut:default",
+    "store:default",
+    "clipboard-manager:default",
+    "dialog:default",
+    "fs:default"
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicegui-dev/nice-gui/master/tauri-schema.json",
+  "productName": "Spoko Whisper",
+  "version": "0.1.0",
+  "identifier": "dev.spoko.whisper",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Spoko Whisper",
+        "width": 400,
+        "height": 520,
+        "resizable": false,
+        "center": true
+      },
+      {
+        "label": "status-bar",
+        "title": "",
+        "width": 200,
+        "height": 36,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "x": 600,
+        "y": 12
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "13.0",
+      "signingIdentity": "Apple Development: Yaroslav Hrydkovets (357K2X6ZCZ)"
+    },
+    "iOS": {},
+    "createUpdaterArtifacts": false
+  }
+}

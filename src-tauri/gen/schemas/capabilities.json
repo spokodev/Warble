@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"Capability for the main window and tray","local":true,"windows":["main","status-bar","settings","history"],"permissions":["core:default","global-shortcut:default","store:default","clipboard-manager:default","dialog:default","fs:default"]}}
