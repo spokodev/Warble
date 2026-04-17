@@ -19,6 +19,7 @@ export interface AppConfig {
   autoPaste: boolean;
   datasetCollectionEnabled: boolean;
   history: HistoryEntry[];
+  hotkey: string;
   theme: ThemeId;
   darkMode: DarkMode;
 }
@@ -36,6 +37,7 @@ export const updateHistoryEntry = (index: number, newText: string) => invoke("up
 export const getVocabulary = () => invoke<string>("get_vocabulary");
 export const setVocabulary = (content: string) => invoke("set_vocabulary", { content });
 export const detectProvider = (apiKey: string) => invoke<string | null>("detect_provider", { apiKey });
+export const setHotkey = (hotkey: string) => invoke("set_hotkey", { hotkey });
 export const setTheme = (theme: ThemeId) => invoke("set_theme", { theme });
 export const setDarkMode = (mode: DarkMode) => invoke("set_dark_mode", { mode });
 

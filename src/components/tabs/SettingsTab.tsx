@@ -48,6 +48,33 @@ export function SettingsTab({
         onDarkModeChange={onDarkModeChange}
       />
 
+      {/* Hotkey */}
+      <div>
+        <label className="block font-medium mb-1 text-text-primary">
+          Recording Hotkey
+        </label>
+        <select
+          value={config.hotkey}
+          onChange={(e) => {
+            setConfig({ ...config, hotkey: e.target.value });
+            invoke("set_hotkey", { hotkey: e.target.value });
+          }}
+          className="select w-full"
+        >
+          <option value="F5">F5</option>
+          <option value="F6">F6</option>
+          <option value="F7">F7</option>
+          <option value="F8">F8</option>
+          <option value="F9">F9</option>
+          <option value="CmdOrCtrl+Shift+R">Cmd/Ctrl + Shift + R</option>
+          <option value="CmdOrCtrl+Shift+S">Cmd/Ctrl + Shift + S</option>
+          <option value="Alt+Space">Alt + Space</option>
+        </select>
+        <p className="text-xs text-text-tertiary mt-1">
+          Right ⌘ tap also works on macOS (requires Accessibility)
+        </p>
+      </div>
+
       {/* API Key */}
       <div>
         <label className="block font-medium mb-1 text-text-primary">

@@ -20,6 +20,8 @@ pub struct AppConfig {
     pub auto_paste: bool,
     pub dataset_collection_enabled: bool,
     pub history: Vec<HistoryEntry>,
+    /// Global shortcut for recording toggle (e.g. "F5", "CmdOrCtrl+Shift+R")
+    pub hotkey: String,
     /// Color theme: "amber", "teal", or "violet"
     pub theme: String,
     /// Dark mode: "light", "dark", or "system"
@@ -36,6 +38,7 @@ impl Default for AppConfig {
             auto_paste: true,
             dataset_collection_enabled: true,
             history: Vec::new(),
+            hotkey: "F5".to_string(),
             theme: "amber".to_string(),
             dark_mode: "system".to_string(),
         }

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Background: dark slate rounded super-ellipse -->
+  <rect width="1024" height="1024" rx="220" ry="220" fill="#0F172A"/>
+
+  <!-- Sound wave / bird wing glyph in amber gold -->
+  <!-- Small source dot (bird body / sound origin) -->
+  <circle cx="380" cy="580" r="32" fill="#F59E0B"/>
+
+  <!-- Wave/Wing arc 1 (innermost, thickest) -->
+  <path d="M420 540 Q520 380 620 440"
+        stroke="#F59E0B" stroke-width="40" stroke-linecap="round" fill="none"/>
+
+  <!-- Wave/Wing arc 2 (middle) -->
+  <path d="M440 500 Q560 300 700 380"
+        stroke="#F59E0B" stroke-width="32" stroke-linecap="round" fill="none" opacity="0.8"/>
+
+  <!-- Wave/Wing arc 3 (outermost, thinnest) -->
+  <path d="M460 460 Q600 220 780 320"
+        stroke="#F59E0B" stroke-width="24" stroke-linecap="round" fill="none" opacity="0.6"/>
+
+  <!-- Subtle tail feather / lower wave -->
+  <path d="M380 610 Q440 680 540 660"
+        stroke="#F59E0B" stroke-width="20" stroke-linecap="round" fill="none" opacity="0.5"/>
+</svg>

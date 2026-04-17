@@ -88,19 +88,29 @@ pub fn run() {
                 toggle_recording(&handle, &state_for_tray);
             });
 
-            // Register F5 global shortcut
-            log("Setup: registering F5 shortcut...");
+            // Register global shortcut from config (default: F5)
+            let hotkey = {
+                let h = app.state::<Mutex<config::AppConfig>>().lock().unwrap().hotkey.clone();
+                if h.is_empty() { "F5".to_string() } else { h }
+            };
+            log(&format!("Setup: registering hotkey '{}'...", hotkey));
             let handle2 = app.handle().clone();
-            let state_for_f5 = shared_state.clone();
+            let state_for_hotkey = shared_state.clone();
             use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
-            match app.global_shortcut().on_shortcut("F5", move |_app, _shortcut, event| {
-                if event.state == ShortcutState::Pressed {
-                    log("F5 pressed!");
-                    toggle_recording(&handle2, &state_for_f5);
+            let hotkey_for_closure = hotkey.clone();
+            match hotkey.parse::<tauri_plugin_global_shortcut::Shortcut>() {
+                Ok(shortcut) => {
+                    match app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
+                        if event.state == ShortcutState::Pressed {
+                            log(&format!("{} pressed!", hotkey_for_closure));
+                            toggle_recording(&handle2, &state_for_hotkey);
+                        }
+                    }) {
+                        Ok(_) => log("Setup: hotkey registered OK"),
+                        Err(e) => log(&format!("Setup: hotkey FAILED: {}", e)),
+                    }
                 }
-            }) {
-                Ok(_) => log("Setup: F5 shortcut registered OK"),
-                Err(e) => log(&format!("Setup: F5 shortcut FAILED: {}", e)),
+                Err(e) => log(&format!("Setup: invalid hotkey '{}': {}", hotkey, e)),
             }
 
             // Start Right Command key watcher
@@ -135,6 +145,7 @@ pub fn run() {
             commands::get_vocabulary,
             commands::set_vocabulary,
             commands::detect_provider,
+            commands::set_hotkey,
             commands::set_theme,
             commands::set_dark_mode,
         ])
@@ -142,7 +153,7 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
-fn toggle_recording(app: &tauri::AppHandle, shared_state: &state::SharedState) {
+pub fn toggle_recording(app: &tauri::AppHandle, shared_state: &state::SharedState) {
     let current_state = {
         let state = shared_state.lock().unwrap();
         if !state.can_toggle() {

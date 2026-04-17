@@ -1,6 +1,6 @@
 use crate::config::{self, AppConfig, HistoryEntry};
 use crate::state::RecordingState;
-use tauri::State;
+use tauri::{Manager, State};
 
 pub type ConfigMutex = std::sync::Mutex<AppConfig>;
 
@@ -112,6 +112,39 @@ pub fn get_vocabulary() -> String {
 pub fn set_vocabulary(content: String) -> Result<(), String> {
     let path = config::vocabulary_path();
     std::fs::write(&path, &content).map_err(|e| format!("Failed to save vocabulary: {}", e))
+}
+
+#[tauri::command]
+pub fn set_hotkey(hotkey: String, app: tauri::AppHandle, config: State<'_, ConfigMutex>) {
+    use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+
+    let old_hotkey = config.lock().unwrap().hotkey.clone();
+    config.lock().unwrap().hotkey = hotkey.clone();
+    save(&config);
+
+    // Unregister old shortcut
+    if let Ok(old) = old_hotkey.parse::<tauri_plugin_global_shortcut::Shortcut>() {
+        let _ = app.global_shortcut().unregister(old);
+    }
+
+    // Register new shortcut
+    let hotkey_for_closure = hotkey.clone();
+    let state = app.state::<crate::state::SharedState>().inner().clone();
+    let handle = app.clone();
+    match hotkey.parse::<tauri_plugin_global_shortcut::Shortcut>() {
+        Ok(shortcut) => {
+            match app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
+                if event.state == ShortcutState::Pressed {
+                    crate::log(&format!("{} pressed!", hotkey_for_closure));
+                    crate::toggle_recording(&handle, &state);
+                }
+            }) {
+                Ok(_) => crate::log(&format!("Hotkey registered: {}", hotkey)),
+                Err(e) => crate::log(&format!("Hotkey registration FAILED: {}", e)),
+            }
+        }
+        Err(e) => crate::log(&format!("Invalid hotkey '{}': {}", hotkey, e)),
+    }
 }
 
 #[tauri::command]
