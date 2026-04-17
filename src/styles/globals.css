@@ -170,3 +170,17 @@ html.status-bar-window body,
 html.status-bar-window #root {
   background: transparent !important;
 }
+
+/* ── Status bar pill backgrounds (theme-aware) ── */
+.statusbar-state-RECORDING {
+  background: color-mix(in srgb, var(--state-recording) 92%, transparent);
+}
+.statusbar-state-TRANSCRIBING {
+  background: color-mix(in srgb, var(--state-transcribing) 88%, transparent);
+}
+.statusbar-state-STOPPING {
+  background: color-mix(in srgb, var(--state-stopping) 88%, transparent);
+}
+.statusbar-state-IDLE {
+  background: color-mix(in srgb, var(--brand-500) 80%, transparent);
+}

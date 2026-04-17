@@ -26,6 +26,8 @@ pub struct AppConfig {
     pub theme: String,
     /// Dark mode: "light", "dark", or "system"
     pub dark_mode: String,
+    /// Status bar visibility: "always", "recording", or "never"
+    pub status_bar_visibility: String,
 }
 
 impl Default for AppConfig {
@@ -36,11 +38,12 @@ impl Default for AppConfig {
             model: "Systran/faster-whisper-small".to_string(),
             sounds_enabled: true,
             auto_paste: true,
-            dataset_collection_enabled: true,
+            dataset_collection_enabled: false,
             history: Vec::new(),
-            hotkey: "F5".to_string(),
+            hotkey: "RightCommand".to_string(),
             theme: "amber".to_string(),
             dark_mode: "system".to_string(),
+            status_bar_visibility: "always".to_string(),
         }
     }
 }

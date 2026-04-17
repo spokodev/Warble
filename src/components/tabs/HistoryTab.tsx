@@ -1,21 +1,21 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import type { HistoryEntry } from "../../lib/tauri-commands";
 
 interface HistoryTabProps {
   entries: HistoryEntry[];
   setEntries: (e: HistoryEntry[]) => void;
   onClear: () => void;
+  onUpdateEntry?: (idx: number, text: string) => void;
 }
 
-export function HistoryTab({ entries, setEntries, onClear }: HistoryTabProps) {
+export function HistoryTab({ entries, setEntries, onClear, onUpdateEntry }: HistoryTabProps) {
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
   const handleCopy = async (text: string, idx: number) => {
-    await writeText(text);
+    await invoke("copy_to_clipboard", { text });
     setCopiedIdx(idx);
     setTimeout(() => setCopiedIdx(null), 1500);
   };
@@ -31,6 +31,7 @@ export function HistoryTab({ entries, setEntries, onClear }: HistoryTabProps) {
     updated[idx] = { ...updated[idx], text: editText };
     setEntries(updated);
     setEditingIdx(null);
+    onUpdateEntry?.(idx, editText);
   };
 
   const handleCancelEdit = () => {

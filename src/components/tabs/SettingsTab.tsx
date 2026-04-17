@@ -1,10 +1,135 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { LANGUAGES } from "../../lib/languages";
 import { WHISPER_MODELS } from "../../lib/tauri-commands";
-import type { AppConfig, ThemeId, DarkMode } from "../../lib/tauri-commands";
+import type { AppConfig, ThemeId, DarkMode, StatusBarVisibility } from "../../lib/tauri-commands";
 import { Toggle } from "../shared/Toggle";
 import { ThemePicker } from "../shared/ThemePicker";
+
+// ── Hotkey recorder ──
+
+const KEY_MAP: Record<string, string> = {
+  Space: "Space", Enter: "Enter", Tab: "Tab",
+  Backspace: "Backspace", Delete: "Delete",
+  ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right",
+  Home: "Home", End: "End", PageUp: "PageUp", PageDown: "PageDown",
+  Insert: "Insert", Minus: "-", Equal: "=",
+  BracketLeft: "[", BracketRight: "]", Backslash: "\\",
+  Semicolon: ";", Quote: "'", Comma: ",", Period: ".", Slash: "/", Backquote: "`",
+};
+
+function codeToKey(code: string, key: string): string | null {
+  // Right Command as standalone hotkey (macOS)
+  if (code === "MetaRight" && key === "Meta") return "RightCommand";
+  if (["Meta", "Control", "Alt", "Shift"].includes(key)) return null;
+  if (/^F\d{1,2}$/.test(code)) return code;
+  if (code.startsWith("Key")) return code.slice(3);
+  if (code.startsWith("Digit")) return code.slice(5);
+  return KEY_MAP[code] ?? null;
+}
+
+function formatForDisplay(shortcut: string): string {
+  if (shortcut === "RightCommand") return "Right ⌘";
+  return shortcut
+    .split("+")
+    .map((p) => {
+      if (p === "CmdOrCtrl") return "⌘";
+      if (p === "Alt") return "⌥";
+      if (p === "Shift") return "⇧";
+      return p;
+    })
+    .join(" ");
+}
+
+function HotkeyRecorder({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (hotkey: string) => void;
+}) {
+  const [recording, setRecording] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  const startRecording = useCallback(() => {
+    // Pause both global shortcut and Right ⌘ watcher
+    invoke("unregister_hotkey");
+    invoke("pause_hotkey_watcher", { paused: true });
+    setRecording(true);
+  }, []);
+
+  const stopRecording = useCallback(
+    (newHotkey?: string) => {
+      setRecording(false);
+      // Resume Right ⌘ watcher
+      invoke("pause_hotkey_watcher", { paused: false });
+      if (newHotkey) {
+        // User selected a new hotkey — set_hotkey re-registers
+        onChange(newHotkey);
+      } else {
+        // Cancelled — re-register the previous hotkey
+        invoke("set_hotkey", { hotkey: value });
+      }
+    },
+    [onChange, value],
+  );
+
+  const handleCapture = useCallback(
+    (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (e.key === "Escape") {
+        stopRecording();
+        return;
+      }
+
+      const mainKey = codeToKey(e.code, e.key);
+      if (!mainKey) return; // modifier-only, keep waiting
+
+      const parts: string[] = [];
+      if (e.metaKey || e.ctrlKey) parts.push("CmdOrCtrl");
+      if (e.altKey) parts.push("Alt");
+      if (e.shiftKey) parts.push("Shift");
+
+      // RightCommand is a special standalone hotkey
+      if (mainKey === "RightCommand") {
+        stopRecording("RightCommand");
+        return;
+      }
+
+      // Single non-function key without modifier — not a valid global shortcut
+      const isFnKey = /^F\d{1,2}$/.test(mainKey);
+      if (!isFnKey && parts.length === 0) return;
+
+      parts.push(mainKey);
+      stopRecording(parts.join("+"));
+    },
+    [stopRecording],
+  );
+
+  useEffect(() => {
+    if (!recording) return;
+    window.addEventListener("keydown", handleCapture, true);
+    return () => window.removeEventListener("keydown", handleCapture, true);
+  }, [recording, handleCapture]);
+
+  return (
+    <button
+      ref={btnRef}
+      type="button"
+      onClick={() => startRecording()}
+      onBlur={() => stopRecording()}
+      className={`input w-full text-left font-mono text-sm transition-colors ${
+        recording
+          ? "ring-2 ring-brand-500 text-brand-600 dark:text-brand-400"
+          : ""
+      }`}
+    >
+      {recording ? "Press a shortcut…" : formatForDisplay(value)}
+    </button>
+  );
+}
 
 interface SettingsTabProps {
   config: AppConfig;
@@ -48,30 +173,40 @@ export function SettingsTab({
         onDarkModeChange={onDarkModeChange}
       />
 
+      {/* Status Bar Visibility */}
+      <div>
+        <label className="block font-medium mb-1 text-text-primary">
+          Status Bar
+        </label>
+        <select
+          value={config.statusBarVisibility}
+          onChange={(e) => {
+            const v = e.target.value as StatusBarVisibility;
+            setConfig({ ...config, statusBarVisibility: v });
+            invoke("set_status_bar_visibility", { visibility: v });
+          }}
+          className="select w-full"
+        >
+          <option value="always">Always visible</option>
+          <option value="recording">Recording only</option>
+          <option value="never">Hidden</option>
+        </select>
+      </div>
+
       {/* Hotkey */}
       <div>
         <label className="block font-medium mb-1 text-text-primary">
           Recording Hotkey
         </label>
-        <select
+        <HotkeyRecorder
           value={config.hotkey}
-          onChange={(e) => {
-            setConfig({ ...config, hotkey: e.target.value });
-            invoke("set_hotkey", { hotkey: e.target.value });
+          onChange={(hotkey) => {
+            setConfig({ ...config, hotkey });
+            invoke("set_hotkey", { hotkey });
           }}
-          className="select w-full"
-        >
-          <option value="F5">F5</option>
-          <option value="F6">F6</option>
-          <option value="F7">F7</option>
-          <option value="F8">F8</option>
-          <option value="F9">F9</option>
-          <option value="CmdOrCtrl+Shift+R">Cmd/Ctrl + Shift + R</option>
-          <option value="CmdOrCtrl+Shift+S">Cmd/Ctrl + Shift + S</option>
-          <option value="Alt+Space">Alt + Space</option>
-        </select>
+        />
         <p className="text-xs text-text-tertiary mt-1">
-          Right ⌘ tap also works on macOS (requires Accessibility)
+          Click and press any key combination. Default: Right ⌘
         </p>
       </div>
 
@@ -175,14 +310,6 @@ export function SettingsTab({
             Text is copied to clipboard. Press Cmd+V to paste manually.
           </p>
         )}
-        <Toggle
-          checked={config.datasetCollectionEnabled}
-          onChange={(checked) => {
-            setConfig({ ...config, datasetCollectionEnabled: checked });
-            invoke("set_dataset_collection", { enabled: checked });
-          }}
-          label="Save audio+text for fine-tuning"
-        />
       </div>
 
       {/* Vocabulary */}

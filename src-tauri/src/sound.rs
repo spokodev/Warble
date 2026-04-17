@@ -1,10 +1,8 @@
-use std::io::Write;
-
-// Embed sound files at compile time
-const SOUND_START: &[u8] = include_bytes!("../sounds/start.aiff");
-const SOUND_STOP: &[u8] = include_bytes!("../sounds/stop.aiff");
-const SOUND_SUCCESS: &[u8] = include_bytes!("../sounds/success.aiff");
-const SOUND_ERROR: &[u8] = include_bytes!("../sounds/error.aiff");
+// Embed sound files at compile time (WAV format — cross-platform)
+const SOUND_START: &[u8] = include_bytes!("../sounds/start.wav");
+const SOUND_STOP: &[u8] = include_bytes!("../sounds/stop.wav");
+const SOUND_SUCCESS: &[u8] = include_bytes!("../sounds/success.wav");
+const SOUND_ERROR: &[u8] = include_bytes!("../sounds/error.wav");
 
 #[derive(Debug, Clone, Copy)]
 pub enum SoundType {
@@ -30,8 +28,12 @@ fn play_sound_blocking(sound_type: SoundType) -> Result<(), String> {
         SoundType::Error => SOUND_ERROR,
     };
 
-    // Write to a temp file and play with afplay (native macOS, supports AIFF)
-    let temp_path = std::env::temp_dir().join(format!("warble-sound-{:?}.aiff", sound_type));
+    play_sound_bytes(data, sound_type)
+}
+
+#[cfg(target_os = "macos")]
+fn play_sound_bytes(data: &[u8], sound_type: SoundType) -> Result<(), String> {
+    let temp_path = std::env::temp_dir().join(format!("warble-sound-{:?}.wav", sound_type));
     std::fs::write(&temp_path, data)
         .map_err(|e| format!("Failed to write temp sound file: {}", e))?;
 
@@ -45,6 +47,23 @@ fn play_sound_blocking(sound_type: SoundType) -> Result<(), String> {
     if !status.success() {
         return Err(format!("afplay exited with status: {}", status));
     }
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn play_sound_bytes(data: &[u8], _sound_type: SoundType) -> Result<(), String> {
+    use rodio::{Decoder, OutputStream, Sink};
+    use std::io::Cursor;
+
+    let (_stream, handle) = OutputStream::try_default()
+        .map_err(|e| format!("No audio output device: {}", e))?;
+    let sink = Sink::try_new(&handle)
+        .map_err(|e| format!("Failed to create audio sink: {}", e))?;
+    let source = Decoder::new(Cursor::new(data.to_vec()))
+        .map_err(|e| format!("Failed to decode sound: {}", e))?;
+    sink.append(source);
+    sink.sleep_until_end();
 
     Ok(())
 }

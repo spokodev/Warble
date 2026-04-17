@@ -21,6 +21,7 @@ export function MainWindow() {
     lastError,
     history,
     setHistory,
+    updateLastText,
     vocab,
     setVocab,
     vocabDirty,
@@ -74,7 +75,6 @@ export function MainWindow() {
             {provider}
           </span>
         )}
-        <span className="text-xs text-text-tertiary">F5 / Right ⌘</span>
       </div>
 
       {/* Tabs */}
@@ -103,6 +103,7 @@ export function MainWindow() {
             lastText={lastText}
             lastError={lastError}
             apiKeySet={!!config.apiKey}
+            onUpdateLastText={updateLastText}
           />
         )}
         {tab === "settings" && (
@@ -134,6 +135,9 @@ export function MainWindow() {
             onClear={() => {
               invoke("clear_history");
               setHistory([]);
+            }}
+            onUpdateEntry={(idx, text) => {
+              if (idx === 0) updateLastText(text);
             }}
           />
         )}

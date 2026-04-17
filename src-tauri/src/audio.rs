@@ -10,7 +10,14 @@ pub struct AudioRecorder {
     done_flag: Arc<AtomicBool>,
     error: Arc<Mutex<Option<String>>>,
     output_path: PathBuf,
+    /// Peak RMS observed during recording (0.0–1.0). Used for VAD silence detection.
+    peak_rms: Arc<Mutex<f64>>,
 }
+
+/// Minimum peak RMS to consider a recording as containing speech.
+/// Below this threshold, the recording is treated as silence and skipped.
+/// Calibrated for 48kHz mic input; typical speech produces 0.01–0.1 RMS.
+pub const SILENCE_THRESHOLD: f64 = 0.005;
 
 unsafe impl Send for AudioRecorder {}
 unsafe impl Sync for AudioRecorder {}
@@ -28,15 +35,17 @@ impl AudioRecorder {
         let done_flag = Arc::new(AtomicBool::new(false));
         let error: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
         let started: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+        let peak_rms: Arc<Mutex<f64>> = Arc::new(Mutex::new(0.0));
 
         let stop_clone = stop_flag.clone();
         let done_clone = done_flag.clone();
         let error_clone = error.clone();
         let started_clone = started.clone();
         let path_clone = output_path.clone();
+        let peak_rms_clone = peak_rms.clone();
 
         std::thread::spawn(move || {
-            let result = run_recording(path_clone, app_handle, stop_clone.clone(), started_clone);
+            let result = run_recording(path_clone, app_handle, stop_clone.clone(), started_clone, peak_rms_clone);
             if let Err(e) = result {
                 *error_clone.lock().unwrap() = Some(e);
             }
@@ -64,10 +73,13 @@ impl AudioRecorder {
             done_flag,
             error,
             output_path,
+            peak_rms,
         })
     }
 
-    pub fn stop(self) -> Result<PathBuf, String> {
+    /// Stop recording and return (audio_path, peak_rms).
+    /// peak_rms can be checked against SILENCE_THRESHOLD to detect empty recordings.
+    pub fn stop(self) -> Result<(PathBuf, f64), String> {
         self.stop_flag.store(true, Ordering::Release);
 
         let start_time = std::time::Instant::now();
@@ -93,7 +105,8 @@ impl AudioRecorder {
             return Err("Recording too short or empty".to_string());
         }
 
-        Ok(self.output_path.clone())
+        let peak = *self.peak_rms.lock().unwrap();
+        Ok((self.output_path.clone(), peak))
     }
 }
 
@@ -108,6 +121,7 @@ fn run_recording(
     app_handle: AppHandle,
     stop_flag: Arc<AtomicBool>,
     started_flag: Arc<AtomicBool>,
+    peak_rms: Arc<Mutex<f64>>,
 ) -> Result<(), String> {
     let host = cpal::default_host();
     let device = host
@@ -182,6 +196,12 @@ fn run_recording(
                             if rms_count >= emit_interval {
                                 let rms = (rms_accumulator / rms_count as f64).sqrt();
                                 let _ = app_handle.emit("audio-level", rms.min(1.0));
+                                // Track peak RMS for VAD silence detection
+                                if let Ok(mut peak) = peak_rms.lock() {
+                                    if rms > *peak {
+                                        *peak = rms;
+                                    }
+                                }
                                 rms_accumulator = 0.0;
                                 rms_count = 0;
                             }
@@ -213,6 +233,12 @@ fn run_recording(
                             if rms_count >= emit_interval {
                                 let rms = (rms_accumulator / rms_count as f64).sqrt();
                                 let _ = app_handle.emit("audio-level", rms.min(1.0));
+                                // Track peak RMS for VAD silence detection
+                                if let Ok(mut peak) = peak_rms.lock() {
+                                    if rms > *peak {
+                                        *peak = rms;
+                                    }
+                                }
                                 rms_accumulator = 0.0;
                                 rms_count = 0;
                             }

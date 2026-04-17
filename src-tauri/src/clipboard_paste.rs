@@ -2,7 +2,8 @@ use std::sync::atomic::{AtomicI32, Ordering};
 
 static TARGET_PID: AtomicI32 = AtomicI32::new(0);
 
-/// Save the frontmost app's PID before recording.
+/// Save the frontmost app's PID before recording (macOS only).
+#[cfg(target_os = "macos")]
 pub fn save_frontmost_app_pid() {
     unsafe {
         let workspace: cocoa::base::id = msg_send![class!(NSWorkspace), sharedWorkspace];
@@ -15,39 +16,80 @@ pub fn save_frontmost_app_pid() {
     }
 }
 
-/// Copy text to clipboard and simulate Cmd+V.
+#[cfg(not(target_os = "macos"))]
+pub fn save_frontmost_app_pid() {}
+
+/// Copy text to clipboard and simulate paste.
 pub fn copy_and_paste(text: &str) -> Result<(), String> {
     crate::log(&format!("Paste: {} chars", text.len()));
-
-    // Set clipboard
-    set_clipboard(text);
-
-    // Post Cmd+V from main thread
-    unsafe {
-        dispatch::Queue::main().exec_async(|| {
-            post_cmd_v();
-        });
-    }
-
+    set_clipboard(text)?;
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    simulate_paste();
     Ok(())
 }
 
-fn set_clipboard(text: &str) {
+// ── Clipboard ──
+
+#[cfg(target_os = "macos")]
+pub fn set_clipboard(text: &str) -> Result<(), String> {
+    // pbcopy is thread-safe (subprocess) — works from any thread
     let mut child = std::process::Command::new("pbcopy")
         .env("LANG", "en_US.UTF-8")
         .stdin(std::process::Stdio::piped())
         .spawn()
-        .ok();
-    if let Some(ref mut c) = child {
+        .map_err(|e| format!("Failed to run pbcopy: {}", e))?;
+    if let Some(ref mut stdin) = child.stdin {
         use std::io::Write;
-        if let Some(ref mut stdin) = c.stdin {
-            let _ = stdin.write_all(text.as_bytes());
-        }
-        let _ = c.wait();
+        let _ = stdin.write_all(text.as_bytes());
+    }
+    let _ = child.wait();
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn set_clipboard(text: &str) -> Result<(), String> {
+    // arboard is cross-platform and doesn't need external tools
+    let mut clipboard = arboard::Clipboard::new()
+        .map_err(|e| format!("Failed to access clipboard: {}", e))?;
+    clipboard.set_text(text)
+        .map_err(|e| format!("Failed to set clipboard text: {}", e))?;
+    Ok(())
+}
+
+// ── Paste simulation ──
+
+#[cfg(target_os = "macos")]
+fn simulate_paste() {
+    // CoreGraphics CGEvent is proven reliable on macOS — use it directly
+    dispatch::Queue::main().exec_async(|| {
+        post_cmd_v_cg();
+    });
+}
+
+#[cfg(not(target_os = "macos"))]
+fn simulate_paste() {
+    use enigo::{Direction, Enigo, Key, Keyboard, Settings};
+
+    let result = (|| -> Result<(), String> {
+        let mut enigo = Enigo::new(&Settings::default())
+            .map_err(|e| format!("enigo init: {}", e))?;
+        enigo.key(Key::Control, Direction::Press)
+            .map_err(|e| format!("ctrl press: {}", e))?;
+        enigo.key(Key::Unicode('v'), Direction::Click)
+            .map_err(|e| format!("v click: {}", e))?;
+        enigo.key(Key::Control, Direction::Release)
+            .map_err(|e| format!("ctrl release: {}", e))?;
+        Ok(())
+    })();
+
+    match result {
+        Ok(()) => crate::log("Paste: Ctrl+V via enigo"),
+        Err(e) => crate::log(&format!("Paste: failed: {}", e)),
     }
 }
 
-fn post_cmd_v() {
+#[cfg(target_os = "macos")]
+fn post_cmd_v_cg() {
     use core_graphics::event::{CGEvent, CGEventFlags, CGKeyCode};
     use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 
@@ -72,5 +114,5 @@ fn post_cmd_v() {
     up.set_flags(CGEventFlags::CGEventFlagCommand);
     up.post(core_graphics::event::CGEventTapLocation::AnnotatedSession);
 
-    crate::log("Paste: Cmd+V posted");
+    crate::log("Paste: Cmd+V via CoreGraphics");
 }

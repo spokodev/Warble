@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type { ThemeId, DarkMode } from "../lib/tauri-commands";
 
 function applyToDOM(theme: ThemeId, isDark: boolean) {
@@ -15,6 +16,24 @@ function resolveIsDark(mode: DarkMode): boolean {
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
+function loadAndApplyTheme(
+  setThemeState: (t: ThemeId) => void,
+  setDarkModeState: (m: DarkMode) => void,
+  setIsDark: (d: boolean) => void,
+) {
+  invoke<{ theme: ThemeId; darkMode: DarkMode }>("get_config").then(
+    (config) => {
+      const t = config.theme || "amber";
+      const dm = config.darkMode || "system";
+      setThemeState(t);
+      setDarkModeState(dm);
+      const dark = resolveIsDark(dm);
+      setIsDark(dark);
+      applyToDOM(t, dark);
+    },
+  );
+}
+
 export function useTheme() {
   const [theme, setThemeState] = useState<ThemeId>("amber");
   const [darkMode, setDarkModeState] = useState<DarkMode>("system");
@@ -22,17 +41,16 @@ export function useTheme() {
 
   // On mount, read config and apply
   useEffect(() => {
-    invoke<{ theme: ThemeId; darkMode: DarkMode }>("get_config").then(
-      (config) => {
-        const t = config.theme || "amber";
-        const dm = config.darkMode || "system";
-        setThemeState(t);
-        setDarkModeState(dm);
-        const dark = resolveIsDark(dm);
-        setIsDark(dark);
-        applyToDOM(t, dark);
-      },
-    );
+    loadAndApplyTheme(setThemeState, setDarkModeState, setIsDark);
+  }, []);
+
+  // Listen for theme changes from other windows (e.g. settings → status bar)
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    listen("theme-changed", () => {
+      loadAndApplyTheme(setThemeState, setDarkModeState, setIsDark);
+    }).then((u) => { unsub = u; });
+    return () => unsub?.();
   }, []);
 
   // Listen for system preference changes when in "system" mode

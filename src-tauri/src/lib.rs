@@ -1,3 +1,4 @@
+#[cfg(target_os = "macos")]
 #[macro_use]
 extern crate objc;
 
@@ -88,29 +89,39 @@ pub fn run() {
                 toggle_recording(&handle, &state_for_tray);
             });
 
-            // Register global shortcut from config (default: F5)
+            // Register global shortcut from config
             let hotkey = {
                 let h = app.state::<Mutex<config::AppConfig>>().lock().unwrap().hotkey.clone();
-                if h.is_empty() { "F5".to_string() } else { h }
+                h
             };
-            log(&format!("Setup: registering hotkey '{}'...", hotkey));
-            let handle2 = app.handle().clone();
-            let state_for_hotkey = shared_state.clone();
-            use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
-            let hotkey_for_closure = hotkey.clone();
-            match hotkey.parse::<tauri_plugin_global_shortcut::Shortcut>() {
-                Ok(shortcut) => {
-                    match app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
-                        if event.state == ShortcutState::Pressed {
-                            log(&format!("{} pressed!", hotkey_for_closure));
-                            toggle_recording(&handle2, &state_for_hotkey);
+            // "RightCommand" = handled by NSEvent watcher below, no global shortcut needed
+            if hotkey != "RightCommand" && !hotkey.is_empty() {
+                log(&format!("Setup: registering hotkey '{}'...", hotkey));
+                let handle2 = app.handle().clone();
+                let state_for_hotkey = shared_state.clone();
+                use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+                let hotkey_for_closure = hotkey.clone();
+                match hotkey.parse::<tauri_plugin_global_shortcut::Shortcut>() {
+                    Ok(shortcut) => {
+                        match app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
+                            if event.state == ShortcutState::Pressed {
+                                log(&format!("{} pressed!", hotkey_for_closure));
+                                toggle_recording(&handle2, &state_for_hotkey);
+                            }
+                        }) {
+                            Ok(_) => log("Setup: hotkey registered OK"),
+                            Err(e) => log(&format!("Setup: hotkey FAILED: {}", e)),
                         }
-                    }) {
-                        Ok(_) => log("Setup: hotkey registered OK"),
-                        Err(e) => log(&format!("Setup: hotkey FAILED: {}", e)),
                     }
+                    Err(e) => log(&format!("Setup: invalid hotkey '{}': {}", hotkey, e)),
                 }
-                Err(e) => log(&format!("Setup: invalid hotkey '{}': {}", hotkey, e)),
+            } else {
+                log("Setup: using Right ⌘ as hotkey (no global shortcut)");
+            }
+
+            // If hotkey is NOT RightCommand, disable the Right ⌘ watcher
+            if hotkey != "RightCommand" && !hotkey.is_empty() {
+                hotkey::set_paused(true);
             }
 
             // Start Right Command key watcher
@@ -125,6 +136,9 @@ pub fn run() {
                     toggle_recording(&handle3, &state_for_cmd);
                 }
             });
+
+            // Apply initial status bar visibility
+            update_status_bar_visibility(app.handle(), RecordingState::Idle);
 
             log("Setup: complete!");
             Ok(())
@@ -148,6 +162,10 @@ pub fn run() {
             commands::set_hotkey,
             commands::set_theme,
             commands::set_dark_mode,
+            commands::set_status_bar_visibility,
+            commands::copy_to_clipboard,
+            commands::unregister_hotkey,
+            commands::pause_hotkey_watcher,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -171,8 +189,11 @@ pub fn toggle_recording(app: &tauri::AppHandle, shared_state: &state::SharedStat
 
 fn start_recording(app: &tauri::AppHandle, shared_state: &state::SharedState) {
     // Save which app is in foreground BEFORE we start (paste target)
-    // Must run on main thread for NSWorkspace
-    unsafe { dispatch::Queue::main().exec_sync(|| clipboard_paste::save_frontmost_app_pid()) };
+    // Use exec_async to avoid deadlock when called from main thread (global shortcut handler)
+    #[cfg(target_os = "macos")]
+    dispatch::Queue::main().exec_async(|| clipboard_paste::save_frontmost_app_pid());
+    #[cfg(not(target_os = "macos"))]
+    clipboard_paste::save_frontmost_app_pid();
     log("Recording: starting...");
     shared_state
         .lock()
@@ -246,10 +267,10 @@ fn stop_recording(app: &tauri::AppHandle, shared_state: &state::SharedState) {
     let state_clone = shared_state.clone();
 
     tauri::async_runtime::spawn(async move {
-        let audio_path = match tokio::task::spawn_blocking(move || recorder.stop()).await {
-            Ok(Ok(path)) => {
-                log("Recording: audio file saved");
-                path
+        let (audio_path, peak_rms) = match tokio::task::spawn_blocking(move || recorder.stop()).await {
+            Ok(Ok((path, peak))) => {
+                log(&format!("Recording: audio file saved, peak RMS={:.4}", peak));
+                (path, peak)
             }
             Ok(Err(e)) => {
                 log(&format!("Recording: stop FAILED: {}", e));
@@ -262,6 +283,27 @@ fn stop_recording(app: &tauri::AppHandle, shared_state: &state::SharedState) {
                 return;
             }
         };
+
+        // VAD: skip transcription if recording was silence
+        if peak_rms < audio::SILENCE_THRESHOLD {
+            log(&format!(
+                "VAD: recording too quiet (peak RMS {:.4} < threshold {:.4}), skipping transcription",
+                peak_rms,
+                audio::SILENCE_THRESHOLD
+            ));
+            let sounds_enabled = {
+                let cfg = app_handle.state::<Mutex<config::AppConfig>>();
+                let c = cfg.lock().unwrap();
+                c.sounds_enabled
+            };
+            if sounds_enabled {
+                sound::play_sound(sound::SoundType::Error);
+            }
+            let _ = app_handle.emit("transcription-error", "Recording was too quiet — no speech detected".to_string());
+            state_clone.lock().unwrap().set_state(RecordingState::Idle);
+            update_tray(&app_handle, RecordingState::Idle);
+            return;
+        }
 
         state_clone
             .lock()
@@ -338,18 +380,11 @@ fn stop_recording(app: &tauri::AppHandle, shared_state: &state::SharedState) {
                     }
                 } else {
                     // Just copy to clipboard, don't paste
-                    let mut child = std::process::Command::new("pbcopy")
-                        .stdin(std::process::Stdio::piped())
-                        .spawn()
-                        .ok();
-                    if let Some(ref mut c) = child {
-                        use std::io::Write;
-                        if let Some(ref mut stdin) = c.stdin {
-                            let _ = stdin.write_all(text.as_bytes());
-                        }
-                        let _ = c.wait();
+                    if let Err(e) = clipboard_paste::set_clipboard(&text) {
+                        log(&format!("Clipboard: FAILED: {}", e));
+                    } else {
+                        log("Clipboard: text copied (auto-paste off)");
                     }
-                    log("Clipboard: text copied (auto-paste off)");
                 }
 
                 if sounds_enabled {
@@ -397,4 +432,30 @@ fn update_tray(app: &tauri::AppHandle, state: RecordingState) {
         }
     }
     let _ = app.emit("state-changed", state);
+
+    // Update status bar window visibility based on config
+    update_status_bar_visibility(app, state);
+}
+
+pub fn update_status_bar_visibility(app: &tauri::AppHandle, state: RecordingState) {
+    let visibility = {
+        let cfg = app.state::<Mutex<config::AppConfig>>();
+        let c = cfg.lock().unwrap();
+        c.status_bar_visibility.clone()
+    };
+
+    if let Some(window) = app.get_webview_window("status-bar") {
+        let should_show = match visibility.as_str() {
+            "always" => true,
+            "recording" => !matches!(state, RecordingState::Idle),
+            "never" => false,
+            _ => true,
+        };
+
+        if should_show {
+            let _ = window.show();
+        } else {
+            let _ = window.hide();
+        }
+    }
 }

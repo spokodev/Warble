@@ -39,6 +39,9 @@ export function useAppConfig() {
     listen<string>("transcription-error", (e) => {
       setLastError(e.payload);
     }).then((u) => unsubs.push(u));
+    listen("vocabulary-changed", () => {
+      invoke<string>("get_vocabulary").then(setVocab);
+    }).then((u) => unsubs.push(u));
     return () => unsubs.forEach((u) => u());
   }, []);
 
@@ -54,6 +57,20 @@ export function useAppConfig() {
     [config],
   );
 
+  const updateLastText = useCallback(
+    (text: string) => {
+      setLastText(text);
+      // Sync history[0] with the new text
+      setHistory((prev) => {
+        if (prev.length === 0) return prev;
+        const updated = [...prev];
+        updated[0] = { ...updated[0], text };
+        return updated;
+      });
+    },
+    [],
+  );
+
   return {
     config,
     setConfig,
@@ -62,6 +79,7 @@ export function useAppConfig() {
     lastError,
     history,
     setHistory,
+    updateLastText,
     vocab,
     setVocab,
     vocabDirty,

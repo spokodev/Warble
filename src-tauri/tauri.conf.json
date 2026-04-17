@@ -24,11 +24,12 @@
       {
         "label": "status-bar",
         "title": "",
-        "width": 120,
+        "width": 180,
         "height": 28,
         "resizable": false,
         "decorations": false,
         "transparent": true,
+        "shadow": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "center": true,
@@ -36,7 +37,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src ipc: http://ipc.localhost"
     }
   },
   "bundle": {

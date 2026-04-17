@@ -10,6 +10,7 @@ export interface HistoryEntry {
 
 export type ThemeId = "amber" | "teal" | "violet";
 export type DarkMode = "light" | "dark" | "system";
+export type StatusBarVisibility = "always" | "recording" | "never";
 
 export interface AppConfig {
   apiKey: string;
@@ -22,6 +23,7 @@ export interface AppConfig {
   hotkey: string;
   theme: ThemeId;
   darkMode: DarkMode;
+  statusBarVisibility: StatusBarVisibility;
 }
 
 export const getState = () => invoke<RecordingState>("get_state");
@@ -40,6 +42,7 @@ export const detectProvider = (apiKey: string) => invoke<string | null>("detect_
 export const setHotkey = (hotkey: string) => invoke("set_hotkey", { hotkey });
 export const setTheme = (theme: ThemeId) => invoke("set_theme", { theme });
 export const setDarkMode = (mode: DarkMode) => invoke("set_dark_mode", { mode });
+export const setStatusBarVisibility = (visibility: StatusBarVisibility) => invoke("set_status_bar_visibility", { visibility });
 
 export const WHISPER_MODELS = [
   { id: "Systran/faster-whisper-small", label: "Small (fast)", description: "~1s per recording" },
