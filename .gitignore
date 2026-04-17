@@ -3,3 +3,6 @@ dist/
 src-tauri/target/
 *.log
 .DS_Store
+warble-devid.key
+warble-devid.csr
+*.p12

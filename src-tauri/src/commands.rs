@@ -95,6 +95,9 @@ pub fn update_history_entry(index: usize, new_text: String, config: State<'_, Co
         new_text.chars().take(30).collect::<String>(),
     ));
 
+    // Auto-learn: add new words from correction to vocabulary
+    auto_learn_vocabulary(&old_text, &new_text);
+
     drop(cfg);
     save(&config);
     Ok(())
@@ -112,10 +115,69 @@ pub fn set_vocabulary(content: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn set_theme(theme: String, config: State<'_, ConfigMutex>) {
+    config.lock().unwrap().theme = theme;
+    save(&config);
+}
+
+#[tauri::command]
+pub fn set_dark_mode(mode: String, config: State<'_, ConfigMutex>) {
+    config.lock().unwrap().dark_mode = mode;
+    save(&config);
+}
+
+#[tauri::command]
 pub fn detect_provider(api_key: String) -> Option<String> {
     crate::providers::detect_provider(&api_key).map(|p| p.name)
 }
 
 pub fn load_config() -> AppConfig {
     config::load_config_from_file()
+}
+
+/// Extract new words from a correction and append them to vocabulary.txt
+fn auto_learn_vocabulary(old_text: &str, new_text: &str) {
+    use std::collections::HashSet;
+
+    let old_words: HashSet<&str> = old_text
+        .split(|c: char| c.is_whitespace() || c == ',' || c == '.')
+        .filter(|w| !w.is_empty())
+        .collect();
+
+    let new_words: Vec<&str> = new_text
+        .split(|c: char| c.is_whitespace() || c == ',' || c == '.')
+        .filter(|w| !w.is_empty() && !old_words.contains(w) && w.len() > 1)
+        .collect();
+
+    if new_words.is_empty() {
+        return;
+    }
+
+    let vocab_path = config::vocabulary_path();
+    let existing = std::fs::read_to_string(&vocab_path).unwrap_or_default();
+
+    // Don't add words that are already in vocabulary
+    let mut to_add: Vec<&str> = Vec::new();
+    for word in &new_words {
+        if !existing.contains(word) {
+            to_add.push(word);
+        }
+    }
+
+    if to_add.is_empty() {
+        return;
+    }
+
+    // Append under "# Auto-learned" section
+    let mut content = existing;
+    if !content.contains("# Auto-learned") {
+        content.push_str("\n\n# Auto-learned from corrections\n");
+    }
+
+    let learned_line = to_add.join(", ");
+    content.push_str(&learned_line);
+    content.push('\n');
+
+    let _ = std::fs::write(&vocab_path, &content);
+    crate::log(&format!("Vocabulary: auto-learned {} words: {}", to_add.len(), learned_line));
 }

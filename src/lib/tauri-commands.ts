@@ -8,6 +8,9 @@ export interface HistoryEntry {
   datasetId: string | null;
 }
 
+export type ThemeId = "amber" | "teal" | "violet";
+export type DarkMode = "light" | "dark" | "system";
+
 export interface AppConfig {
   apiKey: string;
   language: string;
@@ -16,6 +19,8 @@ export interface AppConfig {
   autoPaste: boolean;
   datasetCollectionEnabled: boolean;
   history: HistoryEntry[];
+  theme: ThemeId;
+  darkMode: DarkMode;
 }
 
 export const getState = () => invoke<RecordingState>("get_state");
@@ -31,6 +36,8 @@ export const updateHistoryEntry = (index: number, newText: string) => invoke("up
 export const getVocabulary = () => invoke<string>("get_vocabulary");
 export const setVocabulary = (content: string) => invoke("set_vocabulary", { content });
 export const detectProvider = (apiKey: string) => invoke<string | null>("detect_provider", { apiKey });
+export const setTheme = (theme: ThemeId) => invoke("set_theme", { theme });
+export const setDarkMode = (mode: DarkMode) => invoke("set_dark_mode", { mode });
 
 export const WHISPER_MODELS = [
   { id: "Systran/faster-whisper-small", label: "Small (fast)", description: "~1s per recording" },

@@ -1,8 +1,6 @@
-use rodio::{Decoder, OutputStream, Sink};
-use std::io::Cursor;
+use std::io::Write;
 
-// Embed macOS system sounds at compile time
-// These will be bundled into the binary
+// Embed sound files at compile time
 const SOUND_START: &[u8] = include_bytes!("../sounds/start.aiff");
 const SOUND_STOP: &[u8] = include_bytes!("../sounds/stop.aiff");
 const SOUND_SUCCESS: &[u8] = include_bytes!("../sounds/success.aiff");
@@ -32,16 +30,21 @@ fn play_sound_blocking(sound_type: SoundType) -> Result<(), String> {
         SoundType::Error => SOUND_ERROR,
     };
 
-    let (_stream, stream_handle) =
-        OutputStream::try_default().map_err(|e| format!("No audio output: {}", e))?;
+    // Write to a temp file and play with afplay (native macOS, supports AIFF)
+    let temp_path = std::env::temp_dir().join(format!("warble-sound-{:?}.aiff", sound_type));
+    std::fs::write(&temp_path, data)
+        .map_err(|e| format!("Failed to write temp sound file: {}", e))?;
 
-    let cursor = Cursor::new(data);
-    let source =
-        Decoder::new(cursor).map_err(|e| format!("Failed to decode sound: {}", e))?;
+    let status = std::process::Command::new("afplay")
+        .arg(&temp_path)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map_err(|e| format!("Failed to run afplay: {}", e))?;
 
-    let sink = Sink::try_new(&stream_handle).map_err(|e| format!("Failed to create sink: {}", e))?;
-    sink.append(source);
-    sink.sleep_until_end();
+    if !status.success() {
+        return Err(format!("afplay exited with status: {}", status));
+    }
 
     Ok(())
 }

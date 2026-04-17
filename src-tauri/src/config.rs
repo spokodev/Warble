@@ -11,7 +11,7 @@ pub struct HistoryEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 pub struct AppConfig {
     pub api_key: String,
     pub language: String,
@@ -20,6 +20,10 @@ pub struct AppConfig {
     pub auto_paste: bool,
     pub dataset_collection_enabled: bool,
     pub history: Vec<HistoryEntry>,
+    /// Color theme: "amber", "teal", or "violet"
+    pub theme: String,
+    /// Dark mode: "light", "dark", or "system"
+    pub dark_mode: String,
 }
 
 impl Default for AppConfig {
@@ -32,6 +36,8 @@ impl Default for AppConfig {
             auto_paste: true,
             dataset_collection_enabled: true,
             history: Vec::new(),
+            theme: "amber".to_string(),
+            dark_mode: "system".to_string(),
         }
     }
 }
@@ -50,11 +56,29 @@ impl AppConfig {
     }
 }
 
+// --- Config directory migration ---
+
+/// Migrate config from ~/.whisperspoon to ~/.warble (one-time, on app startup).
+pub fn migrate_config_dir() {
+    let home = dirs::home_dir().expect("No home directory");
+    let old_dir = home.join(".whisperspoon");
+    let new_dir = home.join(".warble");
+
+    if old_dir.exists() && !new_dir.exists() {
+        if let Err(e) = std::fs::rename(&old_dir, &new_dir) {
+            eprintln!(
+                "Failed to migrate config dir from .whisperspoon to .warble: {}",
+                e
+            );
+        }
+    }
+}
+
 // --- File-based config persistence (replaces tauri-plugin-store) ---
 
 fn config_path() -> PathBuf {
     let home = dirs::home_dir().expect("No home directory");
-    home.join(".whisperspoon").join("app-config.json")
+    home.join(".warble").join("app-config.json")
 }
 
 pub fn load_config_from_file() -> AppConfig {
@@ -83,29 +107,29 @@ pub fn save_config_to_file(config: &AppConfig) {
 }
 
 /// Load vocabulary from the user's vocabulary file.
+/// Supports comment lines (starting with #) and joins lines as sentence context.
 pub fn load_vocabulary() -> String {
     let path = vocabulary_path();
     match std::fs::read_to_string(&path) {
         Ok(content) => content
             .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
             .collect::<Vec<_>>()
-            .join(" ")
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" "),
+            .join(". "),
         Err(_) => String::new(),
     }
 }
 
 pub fn vocabulary_path() -> PathBuf {
     let home = dirs::home_dir().expect("No home directory");
-    home.join(".whisperspoon").join("vocabulary.txt")
+    home.join(".warble").join("vocabulary.txt")
 }
 
 /// Try to import settings from existing Hammerspoon config.
 fn import_from_hammerspoon() -> Option<AppConfig> {
     let home = dirs::home_dir()?;
-    let config_path = home.join(".whisperspoon").join("config.json");
+    let config_path = home.join(".warble").join("config.json");
     let content = std::fs::read_to_string(config_path).ok()?;
 
     #[derive(Deserialize)]

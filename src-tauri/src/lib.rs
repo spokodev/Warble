@@ -18,7 +18,7 @@ use state::RecordingState;
 use std::sync::Mutex;
 use tauri::{Emitter, Listener, Manager};
 
-/// Log to ~/.whisperspoon/spoko-whisper.log and stderr
+/// Log to ~/.warble/warble.log and stderr
 fn log(msg: &str) {
     let line = format!(
         "[{}] {}\n",
@@ -27,7 +27,7 @@ fn log(msg: &str) {
     );
     eprint!("{}", line);
     if let Some(home) = dirs::home_dir() {
-        let log_path = home.join(".whisperspoon").join("spoko-whisper.log");
+        let log_path = home.join(".warble").join("warble.log");
         let _ = std::fs::create_dir_all(log_path.parent().unwrap());
         use std::io::Write;
         if let Ok(mut f) = std::fs::OpenOptions::new()
@@ -41,7 +41,8 @@ fn log(msg: &str) {
 }
 
 pub fn run() {
-    log("Starting Spoko Whisper...");
+    config::migrate_config_dir();
+    log("Starting Warble...");
 
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -134,6 +135,8 @@ pub fn run() {
             commands::get_vocabulary,
             commands::set_vocabulary,
             commands::detect_provider,
+            commands::set_theme,
+            commands::set_dark_mode,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -174,11 +177,11 @@ fn start_recording(app: &tauri::AppHandle, shared_state: &state::SharedState) {
 
     let audio_dir = dirs::home_dir()
         .expect("No home dir")
-        .join(".whisperspoon");
+        .join(".warble");
     let _ = std::fs::create_dir_all(&audio_dir);
     let audio_path = audio_dir.join("audio.wav");
 
-    match audio::AudioRecorder::start(audio_path) {
+    match audio::AudioRecorder::start(audio_path, app.clone()) {
         Ok(recorder) => {
             log("Recording: audio capture started");
             let rec_state = app.state::<Mutex<Option<audio::AudioRecorder>>>();
@@ -282,9 +285,17 @@ fn stop_recording(app: &tauri::AppHandle, shared_state: &state::SharedState) {
         }
 
         let vocabulary = config::load_vocabulary();
+
+        // Get last transcription for context window
+        let previous_text = {
+            let cfg = app_handle.state::<Mutex<config::AppConfig>>();
+            let c = cfg.lock().unwrap();
+            c.history.first().map(|h| h.text.clone()).unwrap_or_default()
+        };
+
         log("Transcription: sending to API...");
 
-        match transcription::transcribe(&audio_path, &api_key, &language, &vocabulary, &model).await {
+        match transcription::transcribe(&audio_path, &api_key, &language, &vocabulary, &model, &previous_text).await {
             Ok(raw_text) => {
                 let text = postprocess::cleanup(&raw_text);
                 log(&format!("Transcription: OK, {} chars (raw {})", text.len(), raw_text.len()));

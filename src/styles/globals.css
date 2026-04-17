@@ -1,1 +1,172 @@
 @import "tailwindcss";
+@import "./themes/tokens.css";
+@import "./themes/dawn.css";
+@import "./themes/ocean.css";
+@import "./themes/nebula.css";
+@import "./themes/glass.css";
+@import "./themes/components.css";
+
+/* ── Fonts ── */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/inter/v18/UcCo3FwrK3iLTcviYwY.woff2")
+    format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/jetbrainsmono/v18/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxjPVmUsaaDhw.woff2")
+    format("woff2");
+}
+
+/* ── Tailwind v4 Theme Tokens ── */
+@theme {
+  /* Fonts */
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Brand colors mapped from CSS custom properties */
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+
+  /* Semantic surfaces */
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-surface-inset: var(--surface-inset);
+
+  /* Text */
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-text-inverse: var(--text-inverse);
+
+  /* Borders */
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-border-subtle: var(--border-subtle);
+
+  /* State colors */
+  --color-state-recording: var(--state-recording);
+  --color-state-recording-bg: var(--state-recording-bg);
+  --color-state-transcribing: var(--state-transcribing);
+  --color-state-transcribing-bg: var(--state-transcribing-bg);
+  --color-state-idle: var(--state-idle);
+  --color-state-idle-bg: var(--state-idle-bg);
+  --color-state-error: var(--state-error);
+  --color-state-error-bg: var(--state-error-bg);
+  --color-state-stopping: var(--state-stopping);
+  --color-state-stopping-bg: var(--state-stopping-bg);
+
+  /* Custom animations */
+  --animate-warble-pulse: warble-pulse 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  --animate-warble-ring: warble-ring 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+  --animate-warble-shimmer: warble-shimmer 2s linear infinite;
+  --animate-warble-tab-enter: warble-tab-enter 0.2s ease-out;
+  --animate-warble-shake: warble-shake 0.2s ease-in-out;
+}
+
+/* ── Custom Keyframes ── */
+@keyframes warble-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes warble-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+@keyframes warble-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes warble-tab-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes warble-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+/* ── Shimmer gradient for transcribing state ── */
+.shimmer-bg {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--state-transcribing-bg) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* ── Drag region for frameless windows ── */
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* ── Base styles ── */
+body {
+  font-family: var(--font-sans, "Inter", system-ui, sans-serif);
+  color: var(--text-primary);
+  background: var(--surface);
+}
+
+/* Transparent background for status bar window */
+html.status-bar-window,
+html.status-bar-window body,
+html.status-bar-window #root {
+  background: transparent !important;
+}

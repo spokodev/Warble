@@ -1,8 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicegui-dev/nice-gui/master/tauri-schema.json",
-  "productName": "Spoko Whisper",
+  "productName": "Warble",
   "version": "0.1.0",
-  "identifier": "dev.spoko.whisper",
+  "identifier": "dev.spoko.warble",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -11,10 +11,11 @@
   },
   "app": {
     "withGlobalTauri": true,
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "main",
-        "title": "Spoko Whisper",
+        "title": "Warble",
         "width": 400,
         "height": 520,
         "resizable": false,
@@ -23,15 +24,15 @@
       {
         "label": "status-bar",
         "title": "",
-        "width": 200,
-        "height": 36,
+        "width": 120,
+        "height": 28,
         "resizable": false,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "x": 600,
-        "y": 12
+        "center": true,
+        "y": 8
       }
     ],
     "security": {
@@ -50,7 +51,7 @@
     ],
     "macOS": {
       "minimumSystemVersion": "13.0",
-      "signingIdentity": "Apple Development: Yaroslav Hrydkovets (357K2X6ZCZ)"
+      "signingIdentity": "Developer ID Application: Yaroslav Hrydkovets (26667929BT)"
     },
     "iOS": {},
     "createUpdaterArtifacts": false

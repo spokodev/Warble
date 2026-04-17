@@ -16,14 +16,14 @@ pub fn create_tray(app: &AppHandle) -> Result<tauri::tray::TrayIcon, Box<dyn std
     let settings = MenuItem::with_id(app, "settings", "Settings...", true, None::<&str>)?;
     let history = MenuItem::with_id(app, "history", "History", true, None::<&str>)?;
     let separator2 = MenuItem::with_id(app, "sep2", "", false, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit Spoko Whisper", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit Warble", true, None::<&str>)?;
 
     let menu = Menu::with_items(app, &[&toggle, &separator1, &settings, &history, &separator2, &quit])?;
 
     let tray = TrayIconBuilder::new()
         .icon(Image::from_bytes(TRAY_IDLE)?)
         .icon_as_template(false)
-        .tooltip("Spoko Whisper — Idle")
+        .tooltip("Warble — Idle")
         .menu(&menu)
         .show_menu_on_left_click(true)
         .on_menu_event(move |app, event| match event.id().as_ref() {
@@ -51,10 +51,10 @@ pub fn update_tray_state(
     state: RecordingState,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (icon_data, tooltip, is_template) = match state {
-        RecordingState::Idle => (TRAY_IDLE, "Spoko Whisper — Idle", true),
-        RecordingState::Recording => (TRAY_RECORDING, "Spoko Whisper — Recording...", false),
-        RecordingState::Stopping => (TRAY_RECORDING, "Spoko Whisper — Stopping...", false),
-        RecordingState::Transcribing => (TRAY_TRANSCRIBING, "Spoko Whisper — Transcribing...", true),
+        RecordingState::Idle => (TRAY_IDLE, "Warble — Idle", true),
+        RecordingState::Recording => (TRAY_RECORDING, "Warble — Recording...", false),
+        RecordingState::Stopping => (TRAY_RECORDING, "Warble — Stopping...", false),
+        RecordingState::Transcribing => (TRAY_TRANSCRIBING, "Warble — Transcribing...", true),
     };
 
     tray.set_icon(Some(Image::from_bytes(icon_data)?))?;

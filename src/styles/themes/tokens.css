@@ -1,0 +1,63 @@
+/* tokens.css — Semantic CSS custom properties with Dawn (Amber) as default */
+
+:root {
+  /* Brand scale (Dawn default) */
+  --brand-50: #fffbeb;
+  --brand-100: #fef3c7;
+  --brand-200: #fde68a;
+  --brand-300: #fcd34d;
+  --brand-400: #fbbf24;
+  --brand-500: #f59e0b;
+  --brand-600: #d97706;
+  --brand-700: #b45309;
+  --brand-800: #92400e;
+  --brand-900: #78350f;
+
+  /* Surfaces */
+  --surface: #fffcf5;
+  --surface-elevated: #ffffff;
+  --surface-overlay: rgba(255, 252, 245, 0.85);
+  --surface-inset: #f5f0e8;
+
+  /* Text */
+  --text-primary: #1c1917;
+  --text-secondary: #57534e;
+  --text-tertiary: #a8a29e;
+  --text-inverse: #ffffff;
+
+  /* Borders */
+  --border: #e7e5e4;
+  --border-strong: #d6d3d1;
+  --border-subtle: #f5f5f4;
+
+  /* Glass */
+  --glass-bg: rgba(255, 251, 235, 0.72);
+  --glass-border: rgba(245, 158, 11, 0.15);
+  --glass-highlight: rgba(255, 255, 255, 0.5);
+  --blur-glass: 16px;
+
+  /* States */
+  --state-recording: #ef4444;
+  --state-recording-bg: #fef2f2;
+  --state-transcribing: var(--brand-500);
+  --state-transcribing-bg: var(--brand-50);
+  --state-idle: #22c55e;
+  --state-idle-bg: #f0fdf4;
+  --state-error: #ef4444;
+  --state-error-bg: #fef2f2;
+  --state-success: #22c55e;
+  --state-success-bg: #f0fdf4;
+  --state-stopping: #eab308;
+  --state-stopping-bg: #fefce8;
+
+  /* Interactions */
+  --accent-hover: #d97706;
+  --accent-pressed: #b45309;
+  --accent-focus: rgba(245, 158, 11, 0.4);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(180, 83, 9, 0.04);
+  --shadow-md: 0 4px 12px rgba(180, 83, 9, 0.08);
+  --shadow-lg: 0 8px 24px rgba(180, 83, 9, 0.12);
+  --shadow-glow: 0 0 20px rgba(245, 158, 11, 0.25);
+}

@@ -14,6 +14,7 @@ pub async fn transcribe(
     language: &str,
     vocabulary: &str,
     model_override: &str,
+    previous_text: &str,
 ) -> Result<String, String> {
     let provider = detect_provider(api_key)
         .ok_or_else(|| "Unknown API key format. Supported: wsk-, sk_, gsk, sk-".to_string())?;
@@ -43,8 +44,24 @@ pub async fn transcribe(
         form = form.text("language", language.to_string());
     }
 
-    if provider.supports_vocabulary && !vocabulary.is_empty() {
-        form = form.text("prompt", vocabulary.to_string());
+    // Build prompt: previous transcription context + vocabulary
+    // Whisper uses ~224 token limit for prompt, ~4 chars per token = ~900 chars max
+    if provider.supports_vocabulary {
+        let mut prompt_parts = Vec::new();
+        if !previous_text.is_empty() {
+            // Truncate previous text to ~400 chars to leave room for vocabulary
+            let prev = truncate_str(previous_text, 400);
+            prompt_parts.push(prev.to_string());
+        }
+        if !vocabulary.is_empty() {
+            prompt_parts.push(vocabulary.to_string());
+        }
+        let prompt = prompt_parts.join(". ");
+        if !prompt.is_empty() {
+            // Truncate total prompt to ~900 chars (~224 tokens)
+            let truncated = truncate_str(&prompt, 900);
+            form = form.text("prompt", truncated.to_string());
+        }
     }
 
     let client = reqwest::Client::new();
@@ -74,6 +91,18 @@ pub async fn transcribe(
     }
 
     Ok(text)
+}
+
+/// Truncate a string to at most `max_bytes` without splitting a UTF-8 character.
+fn truncate_str(s: &str, max_bytes: usize) -> &str {
+    if s.len() <= max_bytes {
+        return s;
+    }
+    let mut end = max_bytes;
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    &s[..end]
 }
 
 fn add_auth_header(

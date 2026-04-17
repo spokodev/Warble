@@ -1,67 +1,86 @@
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use cpal::SampleFormat;
 use std::path::PathBuf;
-use std::process::{Child, Command};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use tauri::{AppHandle, Emitter};
 
-/// Records audio using sox `rec` command — same approach as Hammerspoon prototype.
 pub struct AudioRecorder {
-    process: Option<Child>,
+    stop_flag: Arc<AtomicBool>,
+    done_flag: Arc<AtomicBool>,
+    error: Arc<Mutex<Option<String>>>,
     output_path: PathBuf,
 }
 
-impl AudioRecorder {
-    pub fn start(output_path: PathBuf) -> Result<Self, String> {
-        let rec_path = find_rec()?;
+unsafe impl Send for AudioRecorder {}
+unsafe impl Sync for AudioRecorder {}
 
-        // Remove old file to avoid appending
+impl AudioRecorder {
+    pub fn start(output_path: PathBuf, app_handle: AppHandle) -> Result<Self, String> {
         let _ = std::fs::remove_file(&output_path);
 
-        let child = Command::new(&rec_path)
-            .args(["-c", "1", "-r", "16000", "-b", "16"])
-            .arg(output_path.as_os_str())
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .spawn()
-            .map_err(|e| format!("Failed to start rec: {}", e))?;
+        let host = cpal::default_host();
+        let _device = host
+            .default_input_device()
+            .ok_or_else(|| "No microphone detected".to_string())?;
+
+        let stop_flag = Arc::new(AtomicBool::new(false));
+        let done_flag = Arc::new(AtomicBool::new(false));
+        let error: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let started: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+
+        let stop_clone = stop_flag.clone();
+        let done_clone = done_flag.clone();
+        let error_clone = error.clone();
+        let started_clone = started.clone();
+        let path_clone = output_path.clone();
+
+        std::thread::spawn(move || {
+            let result = run_recording(path_clone, app_handle, stop_clone.clone(), started_clone);
+            if let Err(e) = result {
+                *error_clone.lock().unwrap() = Some(e);
+            }
+            done_clone.store(true, Ordering::Release);
+        });
+
+        let start_time = std::time::Instant::now();
+        loop {
+            if started.load(Ordering::Acquire) {
+                break;
+            }
+            if done_flag.load(Ordering::Acquire) {
+                let err = error.lock().unwrap().take();
+                return Err(err.unwrap_or_else(|| "Recording failed to start".to_string()));
+            }
+            if start_time.elapsed().as_secs() > 2 {
+                stop_flag.store(true, Ordering::Release);
+                return Err("Recording startup timed out".to_string());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
 
         Ok(Self {
-            process: Some(child),
+            stop_flag,
+            done_flag,
+            error,
             output_path,
         })
     }
 
-    pub fn stop(mut self) -> Result<PathBuf, String> {
-        if let Some(ref mut child) = self.process {
-            let pid = child.id() as i32;
+    pub fn stop(self) -> Result<PathBuf, String> {
+        self.stop_flag.store(true, Ordering::Release);
 
-            // Send SIGTERM
-            #[cfg(unix)]
-            unsafe {
-                libc::kill(pid, libc::SIGTERM);
+        let start_time = std::time::Instant::now();
+        while !self.done_flag.load(Ordering::Acquire) {
+            if start_time.elapsed().as_secs() > 3 {
+                return Err("Recording stop timed out".to_string());
             }
-
-            // Wait with timeout (max 2 seconds)
-            let start = std::time::Instant::now();
-            loop {
-                match child.try_wait() {
-                    Ok(Some(_)) => break,
-                    Ok(None) => {
-                        if start.elapsed().as_secs() > 2 {
-                            // Force kill if stuck
-                            let _ = child.kill();
-                            let _ = child.wait();
-                            break;
-                        }
-                        std::thread::sleep(std::time::Duration::from_millis(50));
-                    }
-                    Err(_) => break,
-                }
-            }
-
-            self.process = None;
+            std::thread::sleep(std::time::Duration::from_millis(10));
         }
 
-        // Brief pause for file to be flushed
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        if let Some(err) = self.error.lock().unwrap().take() {
+            return Err(err);
+        }
 
         if !self.output_path.exists() {
             return Err("Recording file was not created".to_string());
@@ -80,25 +99,164 @@ impl AudioRecorder {
 
 impl Drop for AudioRecorder {
     fn drop(&mut self) {
-        if let Some(ref mut child) = self.process {
-            #[cfg(unix)]
-            unsafe {
-                libc::kill(child.id() as i32, libc::SIGTERM);
-            }
-            let _ = child.wait();
-        }
+        self.stop_flag.store(true, Ordering::Release);
     }
 }
 
-fn find_rec() -> Result<String, String> {
-    for path in &[
-        "/opt/homebrew/bin/rec",
-        "/usr/local/bin/rec",
-        "/usr/bin/rec",
-    ] {
-        if std::path::Path::new(path).exists() {
-            return Ok(path.to_string());
+fn run_recording(
+    output_path: PathBuf,
+    app_handle: AppHandle,
+    stop_flag: Arc<AtomicBool>,
+    started_flag: Arc<AtomicBool>,
+) -> Result<(), String> {
+    let host = cpal::default_host();
+    let device = host
+        .default_input_device()
+        .ok_or_else(|| "No microphone detected".to_string())?;
+
+    let default_config = device
+        .default_input_config()
+        .map_err(|e| format!("Failed to get default input config: {}", e))?;
+
+    let sample_rate = default_config.sample_rate().0;
+    let device_channels = default_config.channels();
+    let sample_format = default_config.sample_format();
+
+    // Log device config for debugging
+    eprintln!(
+        "Audio: device='{}', rate={}Hz, channels={}, format={:?}",
+        device.name().unwrap_or_else(|_| "unknown".to_string()),
+        sample_rate,
+        device_channels,
+        sample_format
+    );
+
+    let config = cpal::StreamConfig {
+        channels: device_channels,
+        sample_rate: cpal::SampleRate(sample_rate),
+        buffer_size: cpal::BufferSize::Default,
+    };
+
+    // Always write MONO WAV — Whisper works best with mono audio
+    let spec = hound::WavSpec {
+        channels: 1,
+        sample_rate,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+
+    let writer = hound::WavWriter::create(&output_path, spec)
+        .map_err(|e| format!("Failed to create WAV file: {}", e))?;
+    let writer = Arc::new(Mutex::new(Some(writer)));
+    let writer_for_stream = writer.clone();
+
+    let stop_for_stream = stop_flag.clone();
+    let ch = device_channels as usize;
+
+    // RMS at ~20Hz
+    let emit_interval = (sample_rate / 20) as u32;
+    let mut rms_accumulator: f64 = 0.0;
+    let mut rms_count: u32 = 0;
+
+    let stream_error: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+    let stream_error_clone = stream_error.clone();
+
+    let stream = match sample_format {
+        SampleFormat::F32 => device.build_input_stream(
+            &config,
+            move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                if stop_for_stream.load(Ordering::Relaxed) {
+                    return;
+                }
+                if let Ok(mut guard) = writer_for_stream.lock() {
+                    if let Some(ref mut w) = *guard {
+                        // Mix down to mono: average all channels per frame
+                        for frame in data.chunks(ch) {
+                            let mono: f32 = frame.iter().sum::<f32>() / ch as f32;
+                            let s16 = (mono.clamp(-1.0, 1.0) * i16::MAX as f32) as i16;
+                            let _ = w.write_sample(s16);
+
+                            // RMS on mono signal
+                            rms_accumulator += (mono as f64) * (mono as f64);
+                            rms_count += 1;
+                            if rms_count >= emit_interval {
+                                let rms = (rms_accumulator / rms_count as f64).sqrt();
+                                let _ = app_handle.emit("audio-level", rms.min(1.0));
+                                rms_accumulator = 0.0;
+                                rms_count = 0;
+                            }
+                        }
+                    }
+                }
+            },
+            move |err| {
+                *stream_error_clone.lock().unwrap() =
+                    Some(format!("Audio stream error: {}", err));
+            },
+            None,
+        ),
+        SampleFormat::I16 => device.build_input_stream(
+            &config,
+            move |data: &[i16], _: &cpal::InputCallbackInfo| {
+                if stop_for_stream.load(Ordering::Relaxed) {
+                    return;
+                }
+                if let Ok(mut guard) = writer_for_stream.lock() {
+                    if let Some(ref mut w) = *guard {
+                        for frame in data.chunks(ch) {
+                            let mono: i32 = frame.iter().map(|&s| s as i32).sum::<i32>() / ch as i32;
+                            let _ = w.write_sample(mono as i16);
+
+                            let normalized = mono as f64 / i16::MAX as f64;
+                            rms_accumulator += normalized * normalized;
+                            rms_count += 1;
+                            if rms_count >= emit_interval {
+                                let rms = (rms_accumulator / rms_count as f64).sqrt();
+                                let _ = app_handle.emit("audio-level", rms.min(1.0));
+                                rms_accumulator = 0.0;
+                                rms_count = 0;
+                            }
+                        }
+                    }
+                }
+            },
+            move |err| {
+                *stream_error_clone.lock().unwrap() =
+                    Some(format!("Audio stream error: {}", err));
+            },
+            None,
+        ),
+        _ => return Err(format!("Unsupported sample format: {:?}", sample_format)),
+    }
+    .map_err(|e| format!("Failed to build audio stream: {}", e))?;
+
+    stream
+        .play()
+        .map_err(|e| format!("Failed to start audio stream: {}", e))?;
+
+    started_flag.store(true, Ordering::Release);
+
+    while !stop_flag.load(Ordering::Acquire) {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        if let Some(err) = stream_error.lock().unwrap().take() {
+            if let Ok(mut guard) = writer.lock() {
+                if let Some(w) = guard.take() {
+                    let _ = w.finalize();
+                }
+            }
+            return Err(err);
         }
     }
-    Err("sox (rec) not found. Install with: brew install sox".to_string())
+
+    drop(stream);
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    if let Ok(mut guard) = writer.lock() {
+        if let Some(w) = guard.take() {
+            w.finalize()
+                .map_err(|e| format!("Failed to finalize WAV: {}", e))?;
+        }
+    }
+
+    Ok(())
 }

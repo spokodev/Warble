@@ -1,0 +1,84 @@
+/* ocean.css — "Ocean" Teal/Cyan theme */
+/* Personality: Crystal clear, sharp, focused. Surgical precision. */
+
+.theme-teal {
+  --brand-50: #f0fdfa;
+  --brand-100: #ccfbf1;
+  --brand-200: #99f6e4;
+  --brand-300: #5eead4;
+  --brand-400: #2dd4bf;
+  --brand-500: #14b8a6;
+  --brand-600: #0d9488;
+  --brand-700: #0f766e;
+  --brand-800: #115e59;
+  --brand-900: #134e4a;
+
+  --surface: #f8fafc;
+  --surface-elevated: #ffffff;
+  --surface-overlay: rgba(248, 250, 252, 0.88);
+  --surface-inset: #f1f5f9;
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #94a3b8;
+  --text-inverse: #ffffff;
+
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --border-subtle: #f1f5f9;
+
+  --glass-bg: rgba(240, 253, 250, 0.70);
+  --glass-border: rgba(20, 184, 166, 0.12);
+  --glass-highlight: rgba(255, 255, 255, 0.6);
+  --blur-glass: 12px;
+
+  --state-transcribing: #14b8a6;
+  --state-transcribing-bg: #f0fdfa;
+
+  --accent-hover: #0d9488;
+  --accent-pressed: #0f766e;
+  --accent-focus: rgba(20, 184, 166, 0.35);
+
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --shadow-glow: 0 0 16px rgba(20, 184, 166, 0.2);
+}
+
+.theme-teal.dark,
+.dark .theme-teal {
+  --surface: #0f172a;
+  --surface-elevated: #1e293b;
+  --surface-overlay: rgba(15, 23, 42, 0.92);
+  --surface-inset: #0b1120;
+
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+  --text-inverse: #0f172a;
+
+  --border: #1e293b;
+  --border-strong: #334155;
+  --border-subtle: #162032;
+
+  --glass-bg: rgba(15, 23, 30, 0.72);
+  --glass-border: rgba(45, 212, 191, 0.10);
+  --glass-highlight: rgba(94, 234, 212, 0.05);
+  --blur-glass: 16px;
+
+  --state-recording-bg: rgba(239, 68, 68, 0.12);
+  --state-transcribing-bg: rgba(20, 184, 166, 0.12);
+  --state-idle-bg: rgba(34, 197, 94, 0.1);
+  --state-error-bg: rgba(239, 68, 68, 0.12);
+  --state-success-bg: rgba(34, 197, 94, 0.1);
+  --state-stopping-bg: rgba(234, 179, 8, 0.12);
+
+  --accent-hover: #2dd4bf;
+  --accent-pressed: #5eead4;
+  --accent-focus: rgba(45, 212, 191, 0.35);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 20px rgba(20, 184, 166, 0.25);
+}

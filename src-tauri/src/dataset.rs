@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 fn dataset_dir() -> PathBuf {
     let home = dirs::home_dir().expect("No home directory");
-    home.join(".whisperspoon").join("dataset")
+    home.join(".warble").join("dataset")
 }
 
 /// Save an audio+text pair to the dataset directory.

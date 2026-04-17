@@ -1,0 +1,84 @@
+/* dawn.css — "Dawn" Amber Gold theme */
+/* Personality: Warmth, premium, natural. Golden hour sunrise. */
+
+.theme-amber {
+  --brand-50: #fffbeb;
+  --brand-100: #fef3c7;
+  --brand-200: #fde68a;
+  --brand-300: #fcd34d;
+  --brand-400: #fbbf24;
+  --brand-500: #f59e0b;
+  --brand-600: #d97706;
+  --brand-700: #b45309;
+  --brand-800: #92400e;
+  --brand-900: #78350f;
+
+  --surface: #fffcf5;
+  --surface-elevated: #ffffff;
+  --surface-overlay: rgba(255, 252, 245, 0.85);
+  --surface-inset: #f5f0e8;
+
+  --text-primary: #1c1917;
+  --text-secondary: #57534e;
+  --text-tertiary: #a8a29e;
+  --text-inverse: #ffffff;
+
+  --border: #e7e5e4;
+  --border-strong: #d6d3d1;
+  --border-subtle: #f5f5f4;
+
+  --glass-bg: rgba(255, 251, 235, 0.72);
+  --glass-border: rgba(245, 158, 11, 0.15);
+  --glass-highlight: rgba(255, 255, 255, 0.5);
+  --blur-glass: 16px;
+
+  --state-transcribing: #f59e0b;
+  --state-transcribing-bg: #fffbeb;
+
+  --accent-hover: #d97706;
+  --accent-pressed: #b45309;
+  --accent-focus: rgba(245, 158, 11, 0.4);
+
+  --shadow-sm: 0 1px 3px rgba(180, 83, 9, 0.04);
+  --shadow-md: 0 4px 12px rgba(180, 83, 9, 0.08);
+  --shadow-lg: 0 8px 24px rgba(180, 83, 9, 0.12);
+  --shadow-glow: 0 0 20px rgba(245, 158, 11, 0.25);
+}
+
+.theme-amber.dark,
+.dark .theme-amber {
+  --surface: #1a1814;
+  --surface-elevated: #242019;
+  --surface-overlay: rgba(26, 24, 20, 0.9);
+  --surface-inset: #141210;
+
+  --text-primary: #fafaf9;
+  --text-secondary: #a8a29e;
+  --text-tertiary: #78716c;
+  --text-inverse: #1c1917;
+
+  --border: #2d2a26;
+  --border-strong: #44403c;
+  --border-subtle: #1f1d1a;
+
+  --glass-bg: rgba(41, 37, 28, 0.68);
+  --glass-border: rgba(251, 191, 36, 0.12);
+  --glass-highlight: rgba(253, 230, 138, 0.06);
+  --blur-glass: 20px;
+
+  --state-recording-bg: rgba(239, 68, 68, 0.12);
+  --state-transcribing-bg: rgba(245, 158, 11, 0.12);
+  --state-idle-bg: rgba(34, 197, 94, 0.1);
+  --state-error-bg: rgba(239, 68, 68, 0.12);
+  --state-success-bg: rgba(34, 197, 94, 0.1);
+  --state-stopping-bg: rgba(234, 179, 8, 0.12);
+
+  --accent-hover: #fbbf24;
+  --accent-pressed: #fcd34d;
+  --accent-focus: rgba(251, 191, 36, 0.4);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 24px rgba(245, 158, 11, 0.3);
+}
